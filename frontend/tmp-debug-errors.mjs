@@ -1,0 +1,15 @@
+﻿import { chromium } from "playwright";
+const browser = await chromium.launch({ headless: true });
+const page = await browser.newPage();
+page.on('pageerror', err => console.log('PAGEERROR', err.message));
+page.on('console', msg => { if(msg.type()==='error') console.log('CONSOLE', msg.text()); });
+await page.goto('http://localhost:5173/login', { waitUntil:'networkidle' });
+await page.getByLabel('Email').fill('smoke-admin@local.test');
+await page.getByLabel('Password').fill('Admin123!');
+await page.getByRole('button',{name:'Login'}).click();
+await page.waitForTimeout(1500);
+console.log('after login', page.url());
+await page.goto('http://localhost:5173/jobs', { waitUntil:'networkidle' });
+await page.waitForTimeout(1500);
+console.log('after jobs', page.url());
+await browser.close();

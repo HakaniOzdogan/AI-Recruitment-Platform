@@ -1,0 +1,19 @@
+.env.prod
+.env.prod.local
+.env
+.env.local
+.env*
+evidence/
+frontend/node_modules/
+frontend/dist/
+node_modules/
+dist/
+backend/bin/
+backend/obj/
+submission/
+deliverables/
+# generic safety nets
+**/node_modules/
+**/dist/
+**/bin/
+**/obj/

@@ -1,0 +1,11 @@
+﻿import { chromium } from "playwright";
+const browser = await chromium.launch({ headless: true });
+const page = await browser.newPage();
+await page.goto('http://localhost:5173/login', { waitUntil: 'networkidle' });
+await page.getByLabel('Email').fill('smoke-admin@local.test');
+await page.getByLabel('Password').fill('Admin123!');
+await page.getByRole('button', { name: 'Login' }).click();
+await page.waitForTimeout(3000);
+console.log('URL=', page.url());
+console.log((await page.locator('body').innerText()).slice(0,300));
+await browser.close();

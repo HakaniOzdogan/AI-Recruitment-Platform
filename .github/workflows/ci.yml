@@ -1,0 +1,173 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  frontend_build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Build
+        run: npm run build
+
+      - name: Lint (if available)
+        run: npm run lint --if-present
+
+      - name: Test (if available)
+        run: npm test --if-present
+
+      - name: Upload Frontend Dist
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+
+  build_test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore İk_otomasyon.sln
+
+      - name: Build
+        run: dotnet build İk_otomasyon.sln -c Release --no-restore
+
+      - name: Test
+        run: |
+          mkdir -p TestResults
+          dotnet test İk_otomasyon.sln -c Release --no-build --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults
+
+      - name: Formatting (if available)
+        shell: bash
+        run: |
+          if dotnet format --version >/dev/null 2>&1; then
+            dotnet format İk_otomasyon.sln --verify-no-changes --verbosity minimal
+          else
+            echo "dotnet format not available, skipping."
+          fi
+
+  migrations_drift:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ik_otomasyon_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ik_otomasyon_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      ConnectionStrings__Default: Host=localhost;Port=5432;Database=ik_otomasyon_ci;Username=postgres;Password=postgres
+      APPLY_MIGRATIONS_ON_STARTUP: "false"
+      JWT_SECRET: ci-jwt-secret-should-be-at-least-32-chars-long-0001
+      ASPNETCORE_ENVIRONMENT: Production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Install EF Tool
+        run: dotnet tool update --global dotnet-ef --version 8.0.24
+
+      - name: Restore
+        run: dotnet restore İk_otomasyon.sln
+
+      - name: Apply migrations to empty DB
+        run: dotnet ef database update --project backend/IkOtomasyon.Api.csproj --startup-project backend/IkOtomasyon.Api.csproj
+
+      - name: Check pending migrations
+        shell: bash
+        run: |
+          dotnet ef migrations list --project backend/IkOtomasyon.Api.csproj --startup-project backend/IkOtomasyon.Api.csproj > migrations-list.txt
+          if grep -q "(Pending)" migrations-list.txt; then
+            echo "Pending migrations detected:"
+            cat migrations-list.txt
+            exit 1
+          fi
+
+      - name: Upload Migration Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: migration-report
+          path: migrations-list.txt
+
+  security_vuln:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore İk_otomasyon.sln
+
+      - name: Vulnerability scan
+        shell: bash
+        run: |
+          dotnet list backend/IkOtomasyon.Api.csproj package --vulnerable --include-transitive | tee vuln-report.txt
+          if grep -Eiq 'High|Critical' vuln-report.txt; then
+            echo "High/Critical vulnerabilities found."
+            exit 1
+          fi
+
+      - name: Upload Vulnerability Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulnerability-report
+          path: vuln-report.txt

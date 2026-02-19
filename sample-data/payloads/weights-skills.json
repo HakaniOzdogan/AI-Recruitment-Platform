@@ -1,0 +1,9 @@
+{
+  "skills": [
+    { "name": "C#", "weight": 0.3, "isRequired": true },
+    { "name": ".NET", "weight": 0.25, "isRequired": true },
+    { "name": "SQL", "weight": 0.2, "isRequired": true },
+    { "name": "Docker", "weight": 0.15, "isRequired": false },
+    { "name": "Azure", "weight": 0.1, "isRequired": false }
+  ]
+}

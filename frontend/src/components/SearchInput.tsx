@@ -1,0 +1,18 @@
+import { Search } from "lucide-react";
+
+export function SearchInput({
+  value,
+  onChange,
+  placeholder = "Search..."
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}): JSX.Element {
+  return (
+    <label className="search-input-wrap">
+      <Search size={16} />
+      <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
+    </label>
+  );
+}

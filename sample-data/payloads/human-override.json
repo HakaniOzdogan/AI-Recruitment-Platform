@@ -1,0 +1,11 @@
+{
+  "criterionKey": "technical",
+  "score": 4,
+  "rationale": "Aday mimari tercihlerini somut trade-off ornekleriyle acikladi.",
+  "evidenceQuotes": [
+    {
+      "quote": "CQRS kullandik, yazma ve okuma yollarini ayirarak sorgu performansini artirdik.",
+      "related_to": "technical"
+    }
+  ]
+}

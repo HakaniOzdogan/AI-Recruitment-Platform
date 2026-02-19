@@ -1,0 +1,10 @@
+{
+  "title": "Senior .NET Developer",
+  "department": "Engineering",
+  "location": "Istanbul",
+  "employmentType": "FullTime",
+  "description": "Mikroservis tabanli .NET projelerinde gorev alacak aday aranir.",
+  "requiredSkills": ["C#", ".NET", "SQL"],
+  "niceToHaveSkills": ["Docker", "Kubernetes", "Azure"],
+  "minExperienceMonths": 48
+}

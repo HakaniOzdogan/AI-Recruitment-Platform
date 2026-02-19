@@ -1,0 +1,16 @@
+﻿import { chromium } from "playwright";
+const browser = await chromium.launch({ headless: true });
+const page = await browser.newPage({ viewport:{width:1440,height:900}});
+await page.goto('http://localhost:5173/login', { waitUntil:'networkidle' });
+await page.getByLabel('Email').fill('smoke-admin@local.test');
+await page.getByLabel('Password').fill('Admin123!');
+await page.getByRole('button',{name:'Login'}).click();
+await page.waitForTimeout(2000);
+console.log('After login URL', page.url());
+await page.goto('http://localhost:5173/jobs', { waitUntil:'networkidle' });
+await page.waitForTimeout(2000);
+console.log('Jobs URL', page.url());
+const t=(await page.locator('body').innerText());
+console.log(t.slice(0,800));
+await page.screenshot({path:'../screenshots/_debug-jobs.png', fullPage:true});
+await browser.close();

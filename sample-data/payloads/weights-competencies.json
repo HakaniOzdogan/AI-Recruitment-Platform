@@ -1,0 +1,9 @@
+{
+  "weights": {
+    "technical": 0.45,
+    "problem_solving": 0.2,
+    "communication": 0.15,
+    "culture_fit": 0.1,
+    "domain_knowledge": 0.1
+  }
+}
