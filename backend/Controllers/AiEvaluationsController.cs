@@ -14,17 +14,18 @@ namespace IkOtomasyon.Api.Controllers;
 public class AiEvaluationsController : ControllerBase
 {
     private readonly AiEvaluationService _service;
-    private readonly PermissionService _permissionService;
     private readonly AppDbContext _db;
+    private readonly IAuthorizationService _authorizationService;
 
-    public AiEvaluationsController(AiEvaluationService service, PermissionService permissionService, AppDbContext db)
+    public AiEvaluationsController(AiEvaluationService service, AppDbContext db, IAuthorizationService authorizationService)
     {
         _service = service;
-        _permissionService = permissionService;
         _db = db;
+        _authorizationService = authorizationService;
     }
 
     [HttpPost("jobs/{jobId:guid}/candidates/{candidateId:guid}/ai-evaluate")]
+    [RequirePermission(PermissionKeys.AiEvaluationRun)]
     public async Task<ActionResult<AiEvaluationResponse>> Evaluate(Guid jobId, Guid candidateId, [FromQuery] bool force = false, CancellationToken ct = default)
     {
         var userId = User.TryGetUserId();
@@ -33,9 +34,9 @@ public class AiEvaluationsController : ControllerBase
             return Unauthorized();
         }
 
-        if (!await HasPermissionAsync(userId.Value, ct))
+        if (!await CanAsync(new AiEvaluationAuthorizationResource(jobId, candidateId), ResourcePolicies.CanRunAiEvaluation))
         {
-            return Forbid();
+            return NotFound();
         }
 
         try
@@ -59,17 +60,12 @@ public class AiEvaluationsController : ControllerBase
     }
 
     [HttpGet("jobs/{jobId:guid}/candidates/{candidateId:guid}/ai-evaluate/latest")]
+    [RequirePermission(PermissionKeys.AiEvaluationRead)]
     public async Task<ActionResult<AiEvaluationResponse>> Latest(Guid jobId, Guid candidateId, CancellationToken ct = default)
     {
-        var userId = User.TryGetUserId();
-        if (userId is null)
+        if (!await CanAsync(new AiEvaluationAuthorizationResource(jobId, candidateId), ResourcePolicies.CanRunAiEvaluation))
         {
-            return Unauthorized();
-        }
-
-        if (!await HasPermissionAsync(userId.Value, ct))
-        {
-            return Forbid();
+            return NotFound();
         }
 
         try
@@ -84,6 +80,7 @@ public class AiEvaluationsController : ControllerBase
     }
 
     [HttpGet("jobs/{jobId:guid}/candidates/{candidateId:guid}/ai-evaluate/history")]
+    [RequirePermission(PermissionKeys.AiEvaluationRead)]
     public async Task<ActionResult<IEnumerable<AiEvaluationResponse>>> History(
         Guid jobId,
         Guid candidateId,
@@ -91,15 +88,9 @@ public class AiEvaluationsController : ControllerBase
         [FromQuery] int offset = 0,
         CancellationToken ct = default)
     {
-        var userId = User.TryGetUserId();
-        if (userId is null)
+        if (!await CanAsync(new AiEvaluationAuthorizationResource(jobId, candidateId), ResourcePolicies.CanRunAiEvaluation))
         {
-            return Unauthorized();
-        }
-
-        if (!await HasPermissionAsync(userId.Value, ct))
-        {
-            return Forbid();
+            return NotFound();
         }
 
         var history = await _service.GetHistoryAsync(jobId, candidateId, limit, offset, ct);
@@ -107,17 +98,12 @@ public class AiEvaluationsController : ControllerBase
     }
 
     [HttpGet("applications/{applicationId:guid}/ai-evaluate/latest")]
+    [RequirePermission(PermissionKeys.AiEvaluationRead)]
     public async Task<ActionResult<AiEvaluationResponse>> LatestByApplication(Guid applicationId, CancellationToken ct = default)
     {
-        var userId = User.TryGetUserId();
-        if (userId is null)
+        if (!await CanAsync(new ApplicationAuthorizationResource(applicationId), ResourcePolicies.CanReadApplication))
         {
-            return Unauthorized();
-        }
-
-        if (!await HasPermissionAsync(userId.Value, ct))
-        {
-            return Forbid();
+            return NotFound();
         }
 
         try
@@ -131,10 +117,10 @@ public class AiEvaluationsController : ControllerBase
         }
     }
 
-    private async Task<bool> HasPermissionAsync(Guid userId, CancellationToken ct)
+    private async Task<bool> CanAsync(IAuthorizationResource resource, string policy)
     {
-        return await _permissionService.HasPermissionAsync(userId, PermissionKeys.JobCreate, ct)
-            || await _permissionService.HasPermissionAsync(userId, PermissionKeys.CandidateManage, ct);
+        var result = await _authorizationService.AuthorizeAsync(User, resource, policy);
+        return result.Succeeded;
     }
 
     private static AiEvaluationResponse ToResponse(AiEvaluationReport report)

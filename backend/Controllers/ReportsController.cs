@@ -15,32 +15,20 @@ namespace IkOtomasyon.Api.Controllers;
 public class ReportsController : ControllerBase
 {
     private readonly AppDbContext _db;
-    private readonly PermissionService _permissionService;
 
-    public ReportsController(AppDbContext db, PermissionService permissionService)
+    public ReportsController(AppDbContext db)
     {
         _db = db;
-        _permissionService = permissionService;
     }
 
     [HttpGet("interview-scores")]
+    [RequirePermission(PermissionKeys.AuditRead)]
     public async Task<ActionResult<IEnumerable<InterviewScoreReportItemResponse>>> InterviewScores(
         [FromQuery] Guid? jobId,
         [FromQuery] Guid? candidateId,
         [FromQuery] int limit = 50,
         CancellationToken ct = default)
     {
-        var userId = User.TryGetUserId();
-        if (userId is null)
-        {
-            return Unauthorized();
-        }
-
-        if (!await CanViewReportsAsync(userId.Value, ct))
-        {
-            return Forbid();
-        }
-
         limit = Math.Clamp(limit, 1, 200);
 
         var scorecards = _db.InterviewScorecards
@@ -124,13 +112,6 @@ public class ReportsController : ControllerBase
         .ToList();
 
         return Ok(result);
-    }
-
-    private async Task<bool> CanViewReportsAsync(Guid userId, CancellationToken ct)
-    {
-        return await _permissionService.HasPermissionAsync(userId, PermissionKeys.CandidateManage, ct)
-            || await _permissionService.HasPermissionAsync(userId, PermissionKeys.ApplicationStageUpdate, ct)
-            || await _permissionService.HasPermissionAsync(userId, PermissionKeys.UserManage, ct);
     }
 
     private static InterviewCriterionLatestResponse MapCriterion(IkOtomasyon.Api.Entities.InterviewCriterionScore score)

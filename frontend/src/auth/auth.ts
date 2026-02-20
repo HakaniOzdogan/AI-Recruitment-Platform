@@ -83,3 +83,71 @@ export function getTokenRoles(): string[] {
 export function hasRole(role: string): boolean {
   return getTokenRoles().some((x) => x.toLowerCase() === role.toLowerCase());
 }
+
+export type TokenUserInfo = {
+  fullName: string;
+  roles: string[];
+  primaryRole: string;
+  initials: string;
+};
+
+function normalizeRoleLabel(role: string): string {
+  const map: Record<string, string> = {
+    hr: "HR",
+    recruiter: "Recruiter",
+    applicant: "Applicant",
+    user: "User",
+    admin: "Admin",
+    hiringmanager: "HiringManager",
+    interviewer: "Interviewer"
+  };
+  const key = role.replace(/\s+/g, "").toLowerCase();
+  return map[key] ?? role;
+}
+
+function getTokenName(payload: Record<string, unknown>): string {
+  const nameClaim = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name";
+  const raw = payload.name ?? payload[nameClaim];
+  if (typeof raw !== "string" || raw.trim().length === 0) {
+    return "Kullanıcı";
+  }
+  return raw.trim();
+}
+
+function getInitials(fullName: string): string {
+  const parts = fullName
+    .split(" ")
+    .map((x) => x.trim())
+    .filter((x) => x.length > 0);
+  if (parts.length === 0) {
+    return "??";
+  }
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+  return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
+}
+
+export function getTokenUserInfo(): TokenUserInfo {
+  const token = getToken();
+  if (!token) {
+    return {
+      fullName: "Kullanıcı",
+      roles: [],
+      primaryRole: "User",
+      initials: "US"
+    };
+  }
+
+  const payload = decodeJwtPayload(token);
+  const fullName = payload ? getTokenName(payload) : "Kullanıcı";
+  const roles = getTokenRoles().map(normalizeRoleLabel);
+  const primaryRole = roles[0] ?? "User";
+
+  return {
+    fullName,
+    roles,
+    primaryRole,
+    initials: getInitials(fullName)
+  };
+}

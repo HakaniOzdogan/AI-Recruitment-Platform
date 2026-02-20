@@ -3,8 +3,11 @@ namespace IkOtomasyon.Api.Entities;
 public class InterviewSession
 {
     public Guid Id { get; set; }
+    public Guid? TenantId { get; set; }
     public Guid ApplicationId { get; set; }
     public Application? Application { get; set; }
+    public Guid? InterviewerUserId { get; set; }
+    public Guid? ApplicantUserId { get; set; }
     public InterviewSessionStatus Status { get; set; } = InterviewSessionStatus.Scheduled;
     public string AiMode { get; set; } = "OFF";
     public string? AiModelName { get; set; }

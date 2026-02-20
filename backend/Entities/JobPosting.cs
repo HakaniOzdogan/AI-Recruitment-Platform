@@ -3,6 +3,7 @@ namespace IkOtomasyon.Api.Entities;
 public class JobPosting
 {
     public Guid Id { get; set; }
+    public Guid? TenantId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Department { get; set; }
     public string? Location { get; set; }
@@ -14,6 +15,7 @@ public class JobPosting
     public string? CompetencyWeightsJson { get; set; }
     public int? MinExperienceMonths { get; set; }
     public Guid CreatedByUserId { get; set; }
+    public Guid? AssignedManagerUserId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? PublishedAt { get; set; }
     public DateTime? ClosedAt { get; set; }

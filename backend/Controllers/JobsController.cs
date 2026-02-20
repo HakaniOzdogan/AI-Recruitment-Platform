@@ -19,21 +19,21 @@ public class JobsController : ControllerBase
     private readonly AppDbContext _db;
     private readonly AtsWorkflowService _workflow;
     private readonly MatchService _matchService;
-    private readonly PermissionService _permissionService;
     private readonly RubricService _rubricService;
+    private readonly IAuthorizationService _authorizationService;
 
     public JobsController(
         AppDbContext db,
         AtsWorkflowService workflow,
         MatchService matchService,
-        PermissionService permissionService,
-        RubricService rubricService)
+        RubricService rubricService,
+        IAuthorizationService authorizationService)
     {
         _db = db;
         _workflow = workflow;
         _matchService = matchService;
-        _permissionService = permissionService;
         _rubricService = rubricService;
+        _authorizationService = authorizationService;
     }
 
     [HttpPost]
@@ -51,6 +51,7 @@ public class JobsController : ControllerBase
     }
 
     [HttpGet]
+    [RequirePermission(PermissionKeys.JobRead)]
     public async Task<ActionResult<IEnumerable<JobResponse>>> List([FromQuery] JobPostingStatus? status, [FromQuery] string? q, CancellationToken ct)
     {
         var query = _db.JobPostings.AsNoTracking().AsQueryable();
@@ -78,8 +79,14 @@ public class JobsController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
+    [RequirePermission(PermissionKeys.JobRead)]
     public async Task<ActionResult<JobResponse>> GetById(Guid id, CancellationToken ct)
     {
+        if (!await CanAsync(new JobAuthorizationResource(id), ResourcePolicies.CanReadJob))
+        {
+            return NotFound();
+        }
+
         var job = await _db.JobPostings.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
         if (job is null)
         {
@@ -90,9 +97,14 @@ public class JobsController : ControllerBase
     }
 
     [HttpPatch("{id:guid}")]
-    [RequirePermission(PermissionKeys.JobCreate)]
+    [RequirePermission(PermissionKeys.JobUpdate)]
     public async Task<ActionResult<JobResponse>> Update(Guid id, [FromBody] JobUpdateRequest request, CancellationToken ct)
     {
+        if (!await CanAsync(new JobAuthorizationResource(id), ResourcePolicies.CanManageJob))
+        {
+            return NotFound();
+        }
+
         try
         {
             var job = await _workflow.UpdateJobAsync(id, request, ct);
@@ -108,6 +120,11 @@ public class JobsController : ControllerBase
     [RequirePermission(PermissionKeys.JobPublish)]
     public async Task<ActionResult<JobResponse>> Publish(Guid id, CancellationToken ct)
     {
+        if (!await CanAsync(new JobAuthorizationResource(id), ResourcePolicies.CanManageJob))
+        {
+            return NotFound();
+        }
+
         try
         {
             var job = await _workflow.PublishJobAsync(id, ct);
@@ -128,6 +145,11 @@ public class JobsController : ControllerBase
     [RequirePermission(PermissionKeys.JobPublish)]
     public async Task<ActionResult<JobResponse>> Close(Guid id, CancellationToken ct)
     {
+        if (!await CanAsync(new JobAuthorizationResource(id), ResourcePolicies.CanManageJob))
+        {
+            return NotFound();
+        }
+
         try
         {
             var job = await _workflow.CloseJobAsync(id, ct);
@@ -145,6 +167,7 @@ public class JobsController : ControllerBase
     }
 
     [HttpGet("{jobId:guid}/candidates/{candidateId:guid}/match")]
+    [RequirePermission(PermissionKeys.JobRead)]
     public async Task<ActionResult<MatchResponse>> Match(Guid jobId, Guid candidateId, [FromQuery] bool force = false, CancellationToken ct = default)
     {
         var userId = User.TryGetUserId();
@@ -153,9 +176,9 @@ public class JobsController : ControllerBase
             return Unauthorized();
         }
 
-        if (!await HasMatchViewPermissionAsync(userId.Value, ct))
+        if (!await CanAsync(new JobAuthorizationResource(jobId), ResourcePolicies.CanReadJob))
         {
-            return Forbid();
+            return NotFound();
         }
 
         try
@@ -179,6 +202,7 @@ public class JobsController : ControllerBase
     }
 
     [HttpGet("{jobId:guid}/matches")]
+    [RequirePermission(PermissionKeys.JobRead)]
     public async Task<ActionResult<IEnumerable<JobMatchListItemResponse>>> ListMatches(
         Guid jobId,
         [FromQuery] int? minScore,
@@ -193,9 +217,9 @@ public class JobsController : ControllerBase
             return Unauthorized();
         }
 
-        if (!await HasMatchViewPermissionAsync(userId.Value, ct))
+        if (!await CanAsync(new JobAuthorizationResource(jobId), ResourcePolicies.CanReadJob))
         {
-            return Forbid();
+            return NotFound();
         }
 
         var jobExists = await _db.JobPostings.AnyAsync(x => x.Id == jobId, ct);
@@ -260,9 +284,14 @@ public class JobsController : ControllerBase
     }
 
     [HttpPut("{jobId:guid}/weights/competencies")]
-    [RequirePermission(PermissionKeys.JobCreate)]
+    [RequirePermission(PermissionKeys.JobWeightsUpdate)]
     public async Task<ActionResult<JobWeightsResponse>> UpdateCompetencyWeights(Guid jobId, [FromBody] JobCompetencyWeightsUpdateRequest request, CancellationToken ct)
     {
+        if (!await CanAsync(new JobAuthorizationResource(jobId), ResourcePolicies.CanManageJob))
+        {
+            return NotFound();
+        }
+
         try
         {
             await _workflow.UpdateCompetencyWeightsAsync(jobId, request.Weights, ct);
@@ -277,9 +306,14 @@ public class JobsController : ControllerBase
     }
 
     [HttpPut("{jobId:guid}/weights/skills")]
-    [RequirePermission(PermissionKeys.JobCreate)]
+    [RequirePermission(PermissionKeys.JobWeightsUpdate)]
     public async Task<ActionResult<JobWeightsResponse>> UpsertSkillWeights(Guid jobId, [FromBody] JobSkillWeightsUpdateRequest request, CancellationToken ct)
     {
+        if (!await CanAsync(new JobAuthorizationResource(jobId), ResourcePolicies.CanManageJob))
+        {
+            return NotFound();
+        }
+
         try
         {
             await _workflow.UpsertSkillWeightsAsync(jobId, request.Skills, ct);
@@ -294,9 +328,14 @@ public class JobsController : ControllerBase
     }
 
     [HttpGet("{jobId:guid}/weights")]
-    [RequirePermission(PermissionKeys.JobCreate)]
+    [RequirePermission(PermissionKeys.JobWeightsRead)]
     public async Task<ActionResult<JobWeightsResponse>> GetWeights(Guid jobId, CancellationToken ct)
     {
+        if (!await CanAsync(new JobAuthorizationResource(jobId), ResourcePolicies.CanReadJob))
+        {
+            return NotFound();
+        }
+
         try
         {
             var data = await _workflow.GetJobWeightsAsync(jobId, ct);
@@ -309,9 +348,14 @@ public class JobsController : ControllerBase
     }
 
     [HttpGet("{jobId:guid}/rubric")]
-    [RequirePermission(PermissionKeys.JobCreate)]
+    [RequirePermission(PermissionKeys.JobWeightsRead)]
     public async Task<ActionResult<JobRubricResponse>> GetRubric(Guid jobId, CancellationToken ct)
     {
+        if (!await CanAsync(new JobAuthorizationResource(jobId), ResourcePolicies.CanReadJob))
+        {
+            return NotFound();
+        }
+
         try
         {
             var template = await _rubricService.GetJobRubricOrDefaultAsync(jobId, ct);
@@ -324,9 +368,14 @@ public class JobsController : ControllerBase
     }
 
     [HttpPut("{jobId:guid}/rubric")]
-    [RequirePermission(PermissionKeys.JobCreate)]
+    [RequirePermission(PermissionKeys.JobWeightsUpdate)]
     public async Task<ActionResult<JobRubricResponse>> UpsertRubric(Guid jobId, [FromBody] JobRubricUpdateRequest request, CancellationToken ct)
     {
+        if (!await CanAsync(new JobAuthorizationResource(jobId), ResourcePolicies.CanManageJob))
+        {
+            return NotFound();
+        }
+
         try
         {
             var template = await _rubricService.UpsertJobRubricAsync(jobId, request, ct);
@@ -409,12 +458,6 @@ public class JobsController : ControllerBase
             criteria);
     }
 
-    private async Task<bool> HasMatchViewPermissionAsync(Guid userId, CancellationToken ct)
-    {
-        return await _permissionService.HasPermissionAsync(userId, PermissionKeys.JobCreate, ct)
-            || await _permissionService.HasPermissionAsync(userId, PermissionKeys.CandidateManage, ct);
-    }
-
     private async Task WriteMatchRecomputeAuditAsync(Guid actorUserId, Guid jobId, Guid candidateId, CancellationToken ct)
     {
         var log = new AuditLog
@@ -434,5 +477,11 @@ public class JobsController : ControllerBase
 
         _db.AuditLogs.Add(log);
         await _db.SaveChangesAsync(ct);
+    }
+
+    private async Task<bool> CanAsync(IAuthorizationResource resource, string policy)
+    {
+        var result = await _authorizationService.AuthorizeAsync(User, resource, policy);
+        return result.Succeeded;
     }
 }

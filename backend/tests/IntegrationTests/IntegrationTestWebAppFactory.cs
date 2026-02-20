@@ -32,7 +32,7 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>
                 ["LLM_SCORING_ENABLED"] = "false",
                 ["APPLY_MIGRATIONS_ON_STARTUP"] = "true",
                 ["RATE_LIMIT_ENABLED"] = "true",
-                ["RateLimit:GlobalPerMinute"] = "120",
+                ["RateLimit:GlobalPerMinute"] = "10000",
                 ["RateLimit:StrictPerMinute"] = "10"
             };
 

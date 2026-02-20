@@ -9,6 +9,7 @@ public class AiEvaluationReportConfiguration : IEntityTypeConfiguration<AiEvalua
     public void Configure(EntityTypeBuilder<AiEvaluationReport> builder)
     {
         builder.HasKey(x => x.Id);
+        builder.Property(x => x.TenantId);
         builder.Property(x => x.ModelName).HasMaxLength(200).IsRequired();
         builder.Property(x => x.InputSnapshotJson).HasColumnType("text").IsRequired();
         builder.Property(x => x.InputSnapshotHash).HasMaxLength(128).IsRequired();
@@ -37,6 +38,7 @@ public class AiEvaluationReportConfiguration : IEntityTypeConfiguration<AiEvalua
             .HasForeignKey(x => x.ApplicationId)
             .IsRequired(false);
 
+        builder.HasIndex(x => x.TenantId);
         builder.HasIndex(x => new { x.JobId, x.CandidateId, x.Version }).IsUnique();
         builder.HasIndex(x => new { x.JobId, x.CandidateId, x.InputSnapshotHash });
     }

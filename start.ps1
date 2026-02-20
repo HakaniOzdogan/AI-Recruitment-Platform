@@ -41,7 +41,7 @@ if (Test-Path (Join-Path $frontendPath "package.json")) {
 # Servislerin ayaga kalkmasini bekle ve tarayiciyi ac
 Start-Sleep -Seconds 5
 Start-Process "http://localhost:8080/swagger"
-Start-Process "http://localhost:8080/health"
+Start-Process "http://localhost:5173"
 
 $frontendReady = $false
 for ($i = 0; $i -lt 20; $i++) {

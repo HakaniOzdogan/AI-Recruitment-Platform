@@ -13,16 +13,27 @@ namespace IkOtomasyon.Api.Controllers;
 public class CvController : ControllerBase
 {
     private readonly CvWorkflowService _cvWorkflow;
+    private readonly IAuthorizationService _authorizationService;
 
-    public CvController(CvWorkflowService cvWorkflow)
+    public CvController(CvWorkflowService cvWorkflow, IAuthorizationService authorizationService)
     {
         _cvWorkflow = cvWorkflow;
+        _authorizationService = authorizationService;
     }
 
     [HttpPost("{cvDocumentId:guid}/parse")]
-    [RequirePermission(PermissionKeys.CandidateManage)]
+    [RequirePermission(PermissionKeys.CandidateCvParse)]
     public async Task<ActionResult<ParseCvResponse>> Parse(Guid cvDocumentId, [FromQuery] bool force = false, CancellationToken ct = default)
     {
+        var authz = await _authorizationService.AuthorizeAsync(
+            User,
+            new CvDocumentAuthorizationResource(cvDocumentId),
+            ResourcePolicies.CanParseCvDocument);
+        if (!authz.Succeeded)
+        {
+            return NotFound();
+        }
+
         try
         {
             var response = await _cvWorkflow.ParseCvAsync(cvDocumentId, force, ct);

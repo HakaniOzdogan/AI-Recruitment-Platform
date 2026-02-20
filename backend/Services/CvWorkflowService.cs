@@ -45,6 +45,7 @@ public class CvWorkflowService
         var document = new CvDocument
         {
             Id = Guid.NewGuid(),
+            TenantId = candidate.TenantId,
             CandidateId = candidate.Id,
             OriginalFileName = stored.OriginalFileName,
             StoredFileName = stored.StoredFileName,

@@ -18,27 +18,47 @@ public class CandidatesController : ControllerBase
     private readonly AppDbContext _db;
     private readonly AtsWorkflowService _workflow;
     private readonly CvWorkflowService _cvWorkflow;
+    private readonly IAuthorizationService _authorizationService;
 
-    public CandidatesController(AppDbContext db, AtsWorkflowService workflow, CvWorkflowService cvWorkflow)
+    public CandidatesController(AppDbContext db, AtsWorkflowService workflow, CvWorkflowService cvWorkflow, IAuthorizationService authorizationService)
     {
         _db = db;
         _workflow = workflow;
         _cvWorkflow = cvWorkflow;
+        _authorizationService = authorizationService;
     }
 
     [HttpPost]
-    [RequirePermission(PermissionKeys.CandidateManage)]
+    [RequirePermission(PermissionKeys.CandidateCreate)]
     public async Task<ActionResult<CandidateResponse>> Create([FromBody] CandidateCreateRequest request, CancellationToken ct)
     {
-        var candidate = await _workflow.CreateCandidateAsync(request, ct);
+        var userId = User.TryGetUserId();
+        if (userId is null)
+        {
+            return Unauthorized();
+        }
+
+        var candidate = await _workflow.CreateCandidateAsync(request, userId.Value, ownerIsActor: User.IsApplicant(), ct);
         HttpContext.SetAuditInfo(AuditActions.CandidateCreate, "Candidate", candidate.Id.ToString());
         return CreatedAtAction(nameof(GetById), new { id = candidate.Id }, ToResponse(candidate));
     }
 
     [HttpGet]
+    [RequirePermission(PermissionKeys.CandidateRead)]
     public async Task<ActionResult<IEnumerable<CandidateResponse>>> List([FromQuery] string? q, CancellationToken ct)
     {
+        var userId = User.TryGetUserId();
+        if (userId is null)
+        {
+            return Unauthorized();
+        }
+
         var query = _db.Candidates.AsNoTracking().AsQueryable();
+        if (User.IsApplicant())
+        {
+            query = query.Where(x => x.OwnerUserId == userId.Value);
+        }
+
         if (!string.IsNullOrWhiteSpace(q))
         {
             var search = q.Trim();
@@ -58,8 +78,14 @@ public class CandidatesController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
+    [RequirePermission(PermissionKeys.CandidateRead)]
     public async Task<ActionResult<CandidateResponse>> GetById(Guid id, CancellationToken ct)
     {
+        if (!await CanAsync(new CandidateAuthorizationResource(id), ResourcePolicies.CanReadCandidate))
+        {
+            return NotFound();
+        }
+
         var candidate = await _db.Candidates.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
         if (candidate is null)
         {
@@ -70,9 +96,14 @@ public class CandidatesController : ControllerBase
     }
 
     [HttpPatch("{id:guid}")]
-    [RequirePermission(PermissionKeys.CandidateManage)]
+    [RequirePermission(PermissionKeys.CandidateUpdate)]
     public async Task<ActionResult<CandidateResponse>> Update(Guid id, [FromBody] CandidateUpdateRequest request, CancellationToken ct)
     {
+        if (!await CanAsync(new CandidateAuthorizationResource(id), ResourcePolicies.CanEditCandidate))
+        {
+            return NotFound();
+        }
+
         try
         {
             var candidate = await _workflow.UpdateCandidateAsync(id, request, ct);
@@ -86,10 +117,15 @@ public class CandidatesController : ControllerBase
     }
 
     [HttpPost("{candidateId:guid}/cv")]
-    [RequirePermission(PermissionKeys.CandidateManage)]
+    [RequirePermission(PermissionKeys.CandidateCvUpload)]
     [Consumes("multipart/form-data")]
     public async Task<ActionResult<CvUploadResponse>> UploadCv(Guid candidateId, [FromForm] CvUploadFormRequest request, CancellationToken ct)
     {
+        if (!await CanAsync(new CandidateAuthorizationResource(candidateId), ResourcePolicies.CanEditCandidate))
+        {
+            return NotFound();
+        }
+
         var file = request.File;
         if (file is null)
         {
@@ -130,9 +166,14 @@ public class CandidatesController : ControllerBase
     }
 
     [HttpGet("{candidateId:guid}/cv")]
-    [RequirePermission(PermissionKeys.CandidateManage)]
+    [RequirePermission(PermissionKeys.CandidateRead)]
     public async Task<ActionResult<IEnumerable<CvDocumentResponse>>> ListCv(Guid candidateId, CancellationToken ct)
     {
+        if (!await CanAsync(new CandidateAuthorizationResource(candidateId), ResourcePolicies.CanReadCandidate))
+        {
+            return NotFound();
+        }
+
         var candidateExists = await _db.Candidates.AnyAsync(x => x.Id == candidateId, ct);
         if (!candidateExists)
         {
@@ -160,9 +201,14 @@ public class CandidatesController : ControllerBase
     }
 
     [HttpGet("{candidateId:guid}/profile")]
-    [RequirePermission(PermissionKeys.CandidateManage)]
+    [RequirePermission(PermissionKeys.CandidateRead)]
     public async Task<ActionResult<CandidateProfileResponse>> GetProfile(Guid candidateId, CancellationToken ct)
     {
+        if (!await CanAsync(new CandidateAuthorizationResource(candidateId), ResourcePolicies.CanReadCandidate))
+        {
+            return NotFound();
+        }
+
         var profile = await _db.CandidateProfiles.AsNoTracking().FirstOrDefaultAsync(x => x.CandidateId == candidateId, ct);
         if (profile is null)
         {
@@ -184,9 +230,14 @@ public class CandidatesController : ControllerBase
     }
 
     [HttpPost("{candidateId:guid}/consent")]
-    [RequirePermission(PermissionKeys.CandidateManage)]
+    [RequirePermission(PermissionKeys.CandidateUpdate)]
     public async Task<ActionResult<object>> UpsertConsent(Guid candidateId, [FromBody] CandidateConsentRequest request, CancellationToken ct)
     {
+        if (!await CanAsync(new CandidateAuthorizationResource(candidateId), ResourcePolicies.CanEditCandidate))
+        {
+            return NotFound();
+        }
+
         var exists = await _db.Candidates.AnyAsync(x => x.Id == candidateId, ct);
         if (!exists)
         {
@@ -229,5 +280,11 @@ public class CandidatesController : ControllerBase
             entity.Phone,
             entity.Source,
             entity.CreatedAt);
+    }
+
+    private async Task<bool> CanAsync(IAuthorizationResource resource, string policy)
+    {
+        var result = await _authorizationService.AuthorizeAsync(User, resource, policy);
+        return result.Succeeded;
     }
 }

@@ -18,9 +18,12 @@ public class AtsWorkflowService
 
     public async Task<JobPosting> CreateJobAsync(JobCreateRequest request, Guid actorUserId, CancellationToken ct = default)
     {
+        var actorTenantId = await ResolveUserTenantIdAsync(actorUserId, ct);
+
         var job = new JobPosting
         {
             Id = Guid.NewGuid(),
+            TenantId = actorTenantId,
             Title = request.Title.Trim(),
             Department = request.Department?.Trim(),
             Location = request.Location?.Trim(),
@@ -31,6 +34,7 @@ public class AtsWorkflowService
             MinExperienceMonths = request.MinExperienceMonths,
             Status = JobPostingStatus.Draft,
             CreatedByUserId = actorUserId,
+            AssignedManagerUserId = null,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -180,11 +184,16 @@ public class AtsWorkflowService
         return job;
     }
 
-    public async Task<Candidate> CreateCandidateAsync(CandidateCreateRequest request, CancellationToken ct = default)
+    public async Task<Candidate> CreateCandidateAsync(CandidateCreateRequest request, Guid actorUserId, bool ownerIsActor, CancellationToken ct = default)
     {
+        var actorTenantId = await ResolveUserTenantIdAsync(actorUserId, ct);
+
         var candidate = new Candidate
         {
             Id = Guid.NewGuid(),
+            TenantId = actorTenantId,
+            OwnerUserId = ownerIsActor ? actorUserId : null,
+            CreatedByUserId = actorUserId,
             FullName = request.FullName.Trim(),
             Email = request.Email?.Trim(),
             Phone = request.Phone?.Trim(),
@@ -234,10 +243,22 @@ public class AtsWorkflowService
             throw new NotFoundException("Job not found.");
         }
 
-        var candidateExists = await _db.Candidates.AnyAsync(x => x.Id == request.CandidateId, ct);
-        if (!candidateExists)
+        var candidate = await _db.Candidates
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == request.CandidateId, ct);
+        if (candidate is null)
         {
             throw new NotFoundException("Candidate not found.");
+        }
+
+        var job = await _db.JobPostings
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == request.JobId, ct)
+            ?? throw new NotFoundException("Job not found.");
+
+        if (job.TenantId != candidate.TenantId)
+        {
+            throw new ConflictException("Job and candidate tenant mismatch.");
         }
 
         var stage = await _db.PipelineStages.FirstOrDefaultAsync(x => x.Name == "Applied", ct)
@@ -246,12 +267,14 @@ public class AtsWorkflowService
         var entity = new Application
         {
             Id = Guid.NewGuid(),
+            TenantId = job.TenantId,
             JobId = request.JobId,
             CandidateId = request.CandidateId,
             StageId = stage.Id,
             Status = ResolveStatusFromStage(stage),
             AppliedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
+            CreatedByUserId = actorUserId,
             LastUpdatedByUserId = actorUserId
         };
 
@@ -288,10 +311,11 @@ public class AtsWorkflowService
         return await GetApplicationOrThrowAsync(entity.Id, ct);
     }
 
-    public async Task<InterviewSession> StartInterviewAsync(Guid applicationId, CancellationToken ct = default)
+    public async Task<InterviewSession> StartInterviewAsync(Guid applicationId, Guid actorUserId, CancellationToken ct = default)
     {
         var application = await _db.Applications
             .AsNoTracking()
+            .Include(x => x.Candidate)
             .FirstOrDefaultAsync(x => x.Id == applicationId, ct)
             ?? throw new NotFoundException("Application not found.");
 
@@ -309,7 +333,10 @@ public class AtsWorkflowService
         var session = new InterviewSession
         {
             Id = Guid.NewGuid(),
+            TenantId = application.TenantId,
             ApplicationId = application.Id,
+            InterviewerUserId = actorUserId,
+            ApplicantUserId = application.Candidate?.OwnerUserId,
             Status = InterviewSessionStatus.InProgress,
             AiMode = "ASSIST",
             CreatedAt = DateTime.UtcNow
@@ -334,6 +361,15 @@ public class AtsWorkflowService
             .Include(x => x.Stage)
             .FirstOrDefaultAsync(x => x.Id == id, ct)
             ?? throw new NotFoundException("Application not found.");
+    }
+
+    private async Task<Guid?> ResolveUserTenantIdAsync(Guid userId, CancellationToken ct)
+    {
+        return await _db.Users
+            .AsNoTracking()
+            .Where(x => x.Id == userId)
+            .Select(x => x.TenantId)
+            .FirstOrDefaultAsync(ct);
     }
 
     private static ApplicationStatus ResolveStatusFromStage(PipelineStage stage)

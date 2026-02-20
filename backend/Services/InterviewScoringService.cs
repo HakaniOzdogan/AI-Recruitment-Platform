@@ -333,6 +333,11 @@ public class InterviewScoringService
         scorecard = new InterviewScorecard
         {
             Id = Guid.NewGuid(),
+            TenantId = await _db.InterviewSessions
+                .AsNoTracking()
+                .Where(x => x.Id == sessionId)
+                .Select(x => x.TenantId)
+                .FirstOrDefaultAsync(ct),
             SessionId = sessionId,
             RubricTemplateId = rubricTemplateId,
             CreatedAt = DateTime.UtcNow

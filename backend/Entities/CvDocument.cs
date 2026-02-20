@@ -3,6 +3,7 @@ namespace IkOtomasyon.Api.Entities;
 public class CvDocument
 {
     public Guid Id { get; set; }
+    public Guid? TenantId { get; set; }
     public Guid CandidateId { get; set; }
     public Candidate? Candidate { get; set; }
     public string OriginalFileName { get; set; } = string.Empty;

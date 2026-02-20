@@ -255,6 +255,7 @@ builder.Services.AddScoped<ILLMClient>(sp =>
 });
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
 builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, ResourceAuthorizationHandler>();
 builder.Services.AddSingleton(new AuthorizationRuntimeState
 {
     Enforced = authorizationEnforced
@@ -279,6 +280,19 @@ builder.Services
 
 builder.Services.AddAuthorization(options =>
 {
+    options.AddPolicy(ResourcePolicies.CanReadJob, policy => policy.AddRequirements(new ResourceAuthorizationRequirement(ResourcePolicies.CanReadJob)));
+    options.AddPolicy(ResourcePolicies.CanManageJob, policy => policy.AddRequirements(new ResourceAuthorizationRequirement(ResourcePolicies.CanManageJob)));
+    options.AddPolicy(ResourcePolicies.CanReadCandidate, policy => policy.AddRequirements(new ResourceAuthorizationRequirement(ResourcePolicies.CanReadCandidate)));
+    options.AddPolicy(ResourcePolicies.CanEditCandidate, policy => policy.AddRequirements(new ResourceAuthorizationRequirement(ResourcePolicies.CanEditCandidate)));
+    options.AddPolicy(ResourcePolicies.CanApplyApplication, policy => policy.AddRequirements(new ResourceAuthorizationRequirement(ResourcePolicies.CanApplyApplication)));
+    options.AddPolicy(ResourcePolicies.CanReadApplication, policy => policy.AddRequirements(new ResourceAuthorizationRequirement(ResourcePolicies.CanReadApplication)));
+    options.AddPolicy(ResourcePolicies.CanManageApplication, policy => policy.AddRequirements(new ResourceAuthorizationRequirement(ResourcePolicies.CanManageApplication)));
+    options.AddPolicy(ResourcePolicies.CanAccessInterview, policy => policy.AddRequirements(new ResourceAuthorizationRequirement(ResourcePolicies.CanAccessInterview)));
+    options.AddPolicy(ResourcePolicies.CanAccessScorecard, policy => policy.AddRequirements(new ResourceAuthorizationRequirement(ResourcePolicies.CanAccessScorecard)));
+    options.AddPolicy(ResourcePolicies.CanOverrideScorecard, policy => policy.AddRequirements(new ResourceAuthorizationRequirement(ResourcePolicies.CanOverrideScorecard)));
+    options.AddPolicy(ResourcePolicies.CanRunAiEvaluation, policy => policy.AddRequirements(new ResourceAuthorizationRequirement(ResourcePolicies.CanRunAiEvaluation)));
+    options.AddPolicy(ResourcePolicies.CanParseCvDocument, policy => policy.AddRequirements(new ResourceAuthorizationRequirement(ResourcePolicies.CanParseCvDocument)));
+
     if (authorizationEnforced)
     {
         return;

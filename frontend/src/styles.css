@@ -219,6 +219,22 @@ pre {
   font-weight: 700;
 }
 
+.user-meta {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.1;
+  gap: 2px;
+}
+
+.user-fullname {
+  font-weight: 600;
+}
+
+.user-role {
+  font-size: 0.75rem;
+}
+
 .user-menu {
   position: absolute;
   right: 0;

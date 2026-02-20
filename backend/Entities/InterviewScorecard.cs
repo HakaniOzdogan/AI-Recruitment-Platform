@@ -3,6 +3,7 @@ namespace IkOtomasyon.Api.Entities;
 public class InterviewScorecard
 {
     public Guid Id { get; set; }
+    public Guid? TenantId { get; set; }
     public Guid SessionId { get; set; }
     public InterviewSession? Session { get; set; }
     public Guid RubricTemplateId { get; set; }

@@ -171,6 +171,7 @@ public class AiEvaluationService
         var report = new AiEvaluationReport
         {
             Id = Guid.NewGuid(),
+            TenantId = job.TenantId,
             JobId = jobId,
             CandidateId = candidateId,
             ApplicationId = appId,

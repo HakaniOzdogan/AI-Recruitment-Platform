@@ -3,6 +3,9 @@ namespace IkOtomasyon.Api.Entities;
 public class Candidate
 {
     public Guid Id { get; set; }
+    public Guid? TenantId { get; set; }
+    public Guid? OwnerUserId { get; set; }
+    public Guid? CreatedByUserId { get; set; }
     public string FullName { get; set; } = string.Empty;
     public string? Email { get; set; }
     public string? Phone { get; set; }

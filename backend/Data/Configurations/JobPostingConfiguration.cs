@@ -9,6 +9,7 @@ public class JobPostingConfiguration : IEntityTypeConfiguration<JobPosting>
     public void Configure(EntityTypeBuilder<JobPosting> builder)
     {
         builder.HasKey(x => x.Id);
+        builder.Property(x => x.TenantId);
         builder.Property(x => x.Title).HasMaxLength(200).IsRequired();
         builder.Property(x => x.Department).HasMaxLength(150);
         builder.Property(x => x.Location).HasMaxLength(150);
@@ -20,6 +21,10 @@ public class JobPostingConfiguration : IEntityTypeConfiguration<JobPosting>
         builder.Property(x => x.MinExperienceMonths);
         builder.Property(x => x.Status).IsRequired();
         builder.Property(x => x.CreatedByUserId).IsRequired();
+        builder.Property(x => x.AssignedManagerUserId);
         builder.Property(x => x.CreatedAt).IsRequired();
+
+        builder.HasIndex(x => x.TenantId);
+        builder.HasIndex(x => x.AssignedManagerUserId);
     }
 }

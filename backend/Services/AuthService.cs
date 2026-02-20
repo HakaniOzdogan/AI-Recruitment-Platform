@@ -61,7 +61,9 @@ public class AuthService
         }
 
         var role = await _db.Roles.FirstOrDefaultAsync(r => r.Name == "User", ct)
+            ?? await _db.Roles.FirstOrDefaultAsync(r => r.Name == "Applicant", ct)
             ?? await _db.Roles.FirstOrDefaultAsync(r => r.Name == "HR", ct)
+            ?? await _db.Roles.FirstOrDefaultAsync(r => r.Name == "Recruiter", ct)
             ?? await _db.Roles.FirstOrDefaultAsync(r => r.Name == "HiringManager", ct);
 
         if (role is null)
@@ -143,6 +145,11 @@ public class AuthService
             new(JwtRegisteredClaimNames.Email, user.Email),
             new(JwtRegisteredClaimNames.Name, user.FullName)
         };
+
+        if (user.TenantId is Guid tenantId)
+        {
+            claims.Add(new Claim("tenantId", tenantId.ToString()));
+        }
 
         foreach (var role in roles)
         {

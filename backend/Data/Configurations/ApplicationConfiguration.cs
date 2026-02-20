@@ -9,9 +9,11 @@ public class ApplicationConfiguration : IEntityTypeConfiguration<Application>
     public void Configure(EntityTypeBuilder<Application> builder)
     {
         builder.HasKey(x => x.Id);
+        builder.Property(x => x.TenantId);
         builder.Property(x => x.Status).IsRequired();
         builder.Property(x => x.AppliedAt).IsRequired();
         builder.Property(x => x.UpdatedAt).IsRequired();
+        builder.Property(x => x.CreatedByUserId);
         builder.Property(x => x.LastUpdatedByUserId).IsRequired();
 
         builder.HasOne(x => x.Job)
@@ -27,6 +29,7 @@ public class ApplicationConfiguration : IEntityTypeConfiguration<Application>
             .HasForeignKey(x => x.StageId)
             .IsRequired();
 
+        builder.HasIndex(x => x.TenantId);
         builder.HasIndex(x => new { x.JobId, x.CandidateId }).IsUnique();
     }
 }

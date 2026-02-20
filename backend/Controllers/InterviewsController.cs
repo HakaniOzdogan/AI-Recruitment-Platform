@@ -14,22 +14,27 @@ public class InterviewsController : ControllerBase
 {
     private readonly InterviewScoringService _scoringService;
     private readonly InterviewOrchestratorService _orchestrator;
-    private readonly PermissionService _permissionService;
+    private readonly IAuthorizationService _authorizationService;
 
     public InterviewsController(
         InterviewScoringService scoringService,
         InterviewOrchestratorService orchestrator,
-        PermissionService permissionService)
+        IAuthorizationService authorizationService)
     {
         _scoringService = scoringService;
         _orchestrator = orchestrator;
-        _permissionService = permissionService;
+        _authorizationService = authorizationService;
     }
 
     [HttpPatch("{sessionId:guid}/mode")]
-    [RequirePermission(PermissionKeys.CandidateManage)]
+    [RequirePermission(PermissionKeys.InterviewCreate)]
     public async Task<ActionResult<object>> UpdateMode(Guid sessionId, [FromBody] InterviewModeUpdateRequest request, CancellationToken ct)
     {
+        if (!await CanAsync(new InterviewAuthorizationResource(sessionId), ResourcePolicies.CanAccessInterview))
+        {
+            return NotFound();
+        }
+
         try
         {
             var session = await _orchestrator.UpdateModeAsync(sessionId, request.AiMode, ct);
@@ -53,17 +58,12 @@ public class InterviewsController : ControllerBase
     }
 
     [HttpGet("{sessionId:guid}")]
+    [RequirePermission(PermissionKeys.InterviewRead)]
     public async Task<ActionResult<object>> GetSession(Guid sessionId, CancellationToken ct = default)
     {
-        var userId = User.TryGetUserId();
-        if (userId is null)
+        if (!await CanAsync(new InterviewAuthorizationResource(sessionId), ResourcePolicies.CanAccessInterview))
         {
-            return Unauthorized();
-        }
-
-        if (!await HasInterviewAccessAsync(userId.Value, ct))
-        {
-            return Forbid();
+            return NotFound();
         }
 
         var session = await _orchestrator.GetSessionAsync(sessionId, ct);
@@ -81,17 +81,12 @@ public class InterviewsController : ControllerBase
     }
 
     [HttpGet("{sessionId:guid}/messages")]
+    [RequirePermission(PermissionKeys.InterviewRead)]
     public async Task<ActionResult<IEnumerable<object>>> GetMessages(Guid sessionId, CancellationToken ct = default)
     {
-        var userId = User.TryGetUserId();
-        if (userId is null)
+        if (!await CanAsync(new InterviewAuthorizationResource(sessionId), ResourcePolicies.CanAccessInterview))
         {
-            return Unauthorized();
-        }
-
-        if (!await HasInterviewAccessAsync(userId.Value, ct))
-        {
-            return Forbid();
+            return NotFound();
         }
 
         var messages = await _orchestrator.GetMessagesAsync(sessionId, ct);
@@ -110,17 +105,12 @@ public class InterviewsController : ControllerBase
     }
 
     [HttpGet("{sessionId:guid}/ai")]
+    [RequirePermission(PermissionKeys.InterviewRead)]
     public async Task<ActionResult<InterviewAiStateResponse>> GetAiState(Guid sessionId, CancellationToken ct = default)
     {
-        var userId = User.TryGetUserId();
-        if (userId is null)
+        if (!await CanAsync(new InterviewAuthorizationResource(sessionId), ResourcePolicies.CanAccessInterview))
         {
-            return Unauthorized();
-        }
-
-        if (!await HasInterviewAccessAsync(userId.Value, ct))
-        {
-            return Forbid();
+            return NotFound();
         }
 
         try
@@ -134,17 +124,12 @@ public class InterviewsController : ControllerBase
     }
 
     [HttpPost("{sessionId:guid}/messages")]
+    [RequirePermission(PermissionKeys.InterviewMessageSend)]
     public async Task<ActionResult<InterviewTurnResponse>> AddCandidateMessage(Guid sessionId, [FromBody] InterviewMessageRequest request, CancellationToken ct = default)
     {
-        var userId = User.TryGetUserId();
-        if (userId is null)
+        if (!await CanAsync(new InterviewAuthorizationResource(sessionId), ResourcePolicies.CanAccessInterview))
         {
-            return Unauthorized();
-        }
-
-        if (!await HasInterviewAccessAsync(userId.Value, ct))
-        {
-            return Forbid();
+            return NotFound();
         }
 
         try
@@ -182,17 +167,12 @@ public class InterviewsController : ControllerBase
     }
 
     [HttpPost("{sessionId:guid}/messages/hiring")]
+    [RequirePermission(PermissionKeys.InterviewMessageSend)]
     public async Task<ActionResult<object>> AddHiringMessage(Guid sessionId, [FromBody] InterviewMessageRequest request, CancellationToken ct = default)
     {
-        var userId = User.TryGetUserId();
-        if (userId is null)
+        if (!await CanAsync(new InterviewAuthorizationResource(sessionId), ResourcePolicies.CanAccessInterview))
         {
-            return Unauthorized();
-        }
-
-        if (!await HasScorePermissionAsync(userId.Value, ct))
-        {
-            return Forbid();
+            return NotFound();
         }
 
         try
@@ -217,17 +197,12 @@ public class InterviewsController : ControllerBase
     }
 
     [HttpPost("{sessionId:guid}/messages/candidate")]
+    [RequirePermission(PermissionKeys.InterviewMessageSend)]
     public async Task<ActionResult<object>> AddCandidateAnswer(Guid sessionId, [FromBody] InterviewMessageRequest request, CancellationToken ct = default)
     {
-        var userId = User.TryGetUserId();
-        if (userId is null)
+        if (!await CanAsync(new InterviewAuthorizationResource(sessionId), ResourcePolicies.CanAccessInterview))
         {
-            return Unauthorized();
-        }
-
-        if (!await HasInterviewAccessAsync(userId.Value, ct))
-        {
-            return Forbid();
+            return NotFound();
         }
 
         try
@@ -252,6 +227,7 @@ public class InterviewsController : ControllerBase
     }
 
     [HttpPost("{sessionId:guid}/score/auto")]
+    [RequirePermission(PermissionKeys.ScorecardRunAuto)]
     public async Task<ActionResult<InterviewScoreResponse>> AutoScore(Guid sessionId, [FromQuery] bool force = false, CancellationToken ct = default)
     {
         var userId = User.TryGetUserId();
@@ -260,9 +236,9 @@ public class InterviewsController : ControllerBase
             return Unauthorized();
         }
 
-        if (!await HasScorePermissionAsync(userId.Value, ct))
+        if (!await CanAsync(new InterviewAuthorizationResource(sessionId), ResourcePolicies.CanAccessInterview))
         {
-            return Forbid();
+            return NotFound();
         }
 
         try
@@ -290,6 +266,7 @@ public class InterviewsController : ControllerBase
     }
 
     [HttpPost("{sessionId:guid}/score/human")]
+    [RequirePermission(PermissionKeys.ScorecardOverride)]
     public async Task<ActionResult<InterviewScoreResponse>> HumanOverride(Guid sessionId, [FromBody] HumanScoreOverrideRequest request, CancellationToken ct = default)
     {
         var userId = User.TryGetUserId();
@@ -298,9 +275,9 @@ public class InterviewsController : ControllerBase
             return Unauthorized();
         }
 
-        if (!await HasScorePermissionAsync(userId.Value, ct))
+        if (!await CanAsync(new InterviewAuthorizationResource(sessionId), ResourcePolicies.CanOverrideScorecard))
         {
-            return Forbid();
+            return NotFound();
         }
 
         try
@@ -324,17 +301,12 @@ public class InterviewsController : ControllerBase
     }
 
     [HttpGet("{sessionId:guid}/score")]
+    [RequirePermission(PermissionKeys.ScorecardRead)]
     public async Task<ActionResult<InterviewScoreResponse>> GetScore(Guid sessionId, CancellationToken ct = default)
     {
-        var userId = User.TryGetUserId();
-        if (userId is null)
+        if (!await CanAsync(new InterviewAuthorizationResource(sessionId), ResourcePolicies.CanAccessInterview))
         {
-            return Unauthorized();
-        }
-
-        if (!await HasScorePermissionAsync(userId.Value, ct))
-        {
-            return Forbid();
+            return NotFound();
         }
 
         try
@@ -347,16 +319,9 @@ public class InterviewsController : ControllerBase
         }
     }
 
-    private async Task<bool> HasScorePermissionAsync(Guid userId, CancellationToken ct)
+    private async Task<bool> CanAsync(IAuthorizationResource resource, string policy)
     {
-        return await _permissionService.HasPermissionAsync(userId, PermissionKeys.CandidateManage, ct)
-            || await _permissionService.HasPermissionAsync(userId, PermissionKeys.ApplicationStageUpdate, ct);
-    }
-
-    private async Task<bool> HasInterviewAccessAsync(Guid userId, CancellationToken ct)
-    {
-        return await _permissionService.HasPermissionAsync(userId, PermissionKeys.CandidateManage, ct)
-            || await _permissionService.HasPermissionAsync(userId, PermissionKeys.ApplicationStageUpdate, ct)
-            || await _permissionService.HasPermissionAsync(userId, PermissionKeys.InterviewParticipate, ct);
+        var result = await _authorizationService.AuthorizeAsync(User, resource, policy);
+        return result.Succeeded;
     }
 }

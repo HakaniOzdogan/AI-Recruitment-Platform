@@ -1,7 +1,7 @@
 import { Briefcase, LayoutDashboard, LogOut, Menu, Shield, UserCheck, Users, X, BarChart3 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { logout } from "../auth/auth";
+import { getTokenUserInfo, logout } from "../auth/auth";
 import { canAccessAdminPanel, canApplyAndInterview, canManageCandidates, canManageJobs, canViewReports } from "../auth/capabilities";
 
 export function AppLayout(): JSX.Element {
@@ -14,6 +14,7 @@ export function AppLayout(): JSX.Element {
   const canSeeCandidates = canManageCandidates();
   const canSeeApplications = canApplyAndInterview();
   const canSeeReports = canViewReports();
+  const user = getTokenUserInfo();
 
   useEffect(() => {
     setSidebarOpen(false);
@@ -113,9 +114,12 @@ export function AppLayout(): JSX.Element {
           <div className="user-menu-wrap">
             <button type="button" className="button ghost" onClick={() => setMenuOpen((v) => !v)} aria-label="User menu">
               <span className="user-avatar" aria-hidden>
-                HR
+                {user.initials}
               </span>
-              <span>User</span>
+              <span className="user-meta">
+                <strong className="user-fullname">{user.fullName}</strong>
+                <small className="muted user-role">Rol: {user.primaryRole}</small>
+              </span>
             </button>
             {menuOpen ? (
               <div className="user-menu">

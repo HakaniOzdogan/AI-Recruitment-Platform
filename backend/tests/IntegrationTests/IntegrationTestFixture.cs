@@ -51,7 +51,7 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
         await DbSeeder.SeedAsync(db, env);
     }
 
-    public async Task<(Guid UserId, string Email, string Password)> EnsureUserAsync(string roleName, string? emailPrefix = null)
+    public async Task<(Guid UserId, string Email, string Password)> EnsureUserAsync(string roleName, string? emailPrefix = null, Guid? tenantId = null)
     {
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -62,6 +62,7 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
         var user = new User
         {
             Id = Guid.NewGuid(),
+            TenantId = tenantId,
             FullName = $"{roleName} User",
             Email = email,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),

@@ -3,6 +3,7 @@
 public class AiEvaluationReport
 {
     public Guid Id { get; set; }
+    public Guid? TenantId { get; set; }
     public Guid JobId { get; set; }
     public JobPosting? Job { get; set; }
     public Guid CandidateId { get; set; }

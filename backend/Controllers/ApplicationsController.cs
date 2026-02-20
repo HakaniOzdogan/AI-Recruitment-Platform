@@ -17,16 +17,17 @@ public class ApplicationsController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly AtsWorkflowService _workflow;
-    private readonly PermissionService _permissionService;
+    private readonly IAuthorizationService _authorizationService;
 
-    public ApplicationsController(AppDbContext db, AtsWorkflowService workflow, PermissionService permissionService)
+    public ApplicationsController(AppDbContext db, AtsWorkflowService workflow, IAuthorizationService authorizationService)
     {
         _db = db;
         _workflow = workflow;
-        _permissionService = permissionService;
+        _authorizationService = authorizationService;
     }
 
     [HttpPost]
+    [RequirePermission(PermissionKeys.ApplicationCreate)]
     public async Task<ActionResult<ApplicationResponse>> Create([FromBody] ApplicationCreateRequest request, CancellationToken ct)
     {
         var userId = User.TryGetUserId();
@@ -34,9 +35,10 @@ public class ApplicationsController : ControllerBase
         {
             return Unauthorized();
         }
-        if (!await CanCreateApplicationAsync(userId.Value, ct))
+
+        if (!await CanAsync(new ApplyAuthorizationResource(request.JobId, request.CandidateId), ResourcePolicies.CanApplyApplication))
         {
-            return Forbid();
+            return NotFound();
         }
 
         try
@@ -56,12 +58,19 @@ public class ApplicationsController : ControllerBase
     }
 
     [HttpGet]
+    [RequirePermission(PermissionKeys.ApplicationRead)]
     public async Task<ActionResult<IEnumerable<ApplicationResponse>>> List(
         [FromQuery] Guid? jobId,
         [FromQuery] Guid? stageId,
         [FromQuery] ApplicationStatus? status,
         CancellationToken ct)
     {
+        var userId = User.TryGetUserId();
+        if (userId is null)
+        {
+            return Unauthorized();
+        }
+
         var query = _db.Applications
             .AsNoTracking()
             .Include(x => x.Job)
@@ -69,6 +78,11 @@ public class ApplicationsController : ControllerBase
             .Include(x => x.Stage)
             .Include(x => x.InterviewSessions)
             .AsQueryable();
+
+        if (User.IsApplicant())
+        {
+            query = query.Where(x => x.Candidate != null && x.Candidate.OwnerUserId == userId.Value);
+        }
 
         if (jobId is not null)
         {
@@ -93,8 +107,14 @@ public class ApplicationsController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
+    [RequirePermission(PermissionKeys.ApplicationRead)]
     public async Task<ActionResult<ApplicationResponse>> GetById(Guid id, CancellationToken ct)
     {
+        if (!await CanAsync(new ApplicationAuthorizationResource(id), ResourcePolicies.CanReadApplication))
+        {
+            return NotFound();
+        }
+
         var entity = await _db.Applications
             .AsNoTracking()
             .Include(x => x.Job)
@@ -112,13 +132,18 @@ public class ApplicationsController : ControllerBase
     }
 
     [HttpPatch("{id:guid}/stage")]
-    [RequirePermission(PermissionKeys.ApplicationStageUpdate)]
+    [RequirePermission(PermissionKeys.ApplicationUpdateStage)]
     public async Task<ActionResult<ApplicationResponse>> ChangeStage(Guid id, [FromBody] StageChangeRequest request, CancellationToken ct)
     {
         var userId = User.TryGetUserId();
         if (userId is null)
         {
             return Unauthorized();
+        }
+
+        if (!await CanAsync(new ApplicationAuthorizationResource(id), ResourcePolicies.CanManageApplication))
+        {
+            return NotFound();
         }
 
         try
@@ -134,6 +159,7 @@ public class ApplicationsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/interviews/start")]
+    [RequirePermission(PermissionKeys.InterviewCreate)]
     public async Task<ActionResult<InterviewStartResponse>> StartInterview(Guid id, CancellationToken ct)
     {
         var userId = User.TryGetUserId();
@@ -141,14 +167,15 @@ public class ApplicationsController : ControllerBase
         {
             return Unauthorized();
         }
-        if (!await CanCreateApplicationAsync(userId.Value, ct))
+
+        if (!await CanAsync(new ApplicationAuthorizationResource(id), ResourcePolicies.CanManageApplication))
         {
-            return Forbid();
+            return NotFound();
         }
 
         try
         {
-            var session = await _workflow.StartInterviewAsync(id, ct);
+            var session = await _workflow.StartInterviewAsync(id, userId.Value, ct);
             HttpContext.SetAuditInfo(AuditActions.InterviewStart, "InterviewSession", session.Id.ToString());
             return Ok(new InterviewStartResponse(session.Id));
         }
@@ -175,9 +202,9 @@ public class ApplicationsController : ControllerBase
             entity.InterviewSessions.OrderByDescending(x => x.CreatedAt).Select(x => (Guid?)x.Id).FirstOrDefault());
     }
 
-    private async Task<bool> CanCreateApplicationAsync(Guid userId, CancellationToken ct)
+    private async Task<bool> CanAsync(IAuthorizationResource resource, string policy)
     {
-        return await _permissionService.HasPermissionAsync(userId, PermissionKeys.CandidateManage, ct)
-            || await _permissionService.HasPermissionAsync(userId, PermissionKeys.ApplicationApply, ct);
+        var result = await _authorizationService.AuthorizeAsync(User, resource, policy);
+        return result.Succeeded;
     }
 }

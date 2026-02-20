@@ -9,6 +9,7 @@ public class InterviewScorecardConfiguration : IEntityTypeConfiguration<Intervie
     public void Configure(EntityTypeBuilder<InterviewScorecard> builder)
     {
         builder.HasKey(x => x.Id);
+        builder.Property(x => x.TenantId);
         builder.Property(x => x.OverallScore);
         builder.Property(x => x.CreatedAt).IsRequired();
 
@@ -20,6 +21,7 @@ public class InterviewScorecardConfiguration : IEntityTypeConfiguration<Intervie
             .WithMany(x => x.Scorecards)
             .HasForeignKey(x => x.RubricTemplateId);
 
+        builder.HasIndex(x => x.TenantId);
         builder.HasIndex(x => new { x.SessionId, x.RubricTemplateId }).IsUnique();
     }
 }

@@ -23,7 +23,7 @@ public static class DbSeeder
 
         if (env.IsDevelopment())
         {
-            await EnsureAdminUserAsync(db, roles["Admin"]);
+            await EnsureAdminUserAsync(db, roles[RoleKeys.Admin]);
         }
     }
 
@@ -50,7 +50,16 @@ public static class DbSeeder
         AppDbContext db,
         IReadOnlyDictionary<string, Permission> permissions)
     {
-        var roleNames = new[] { "Admin", "HR", "HiringManager", "User" };
+        var roleNames = new[]
+        {
+            RoleKeys.Admin,
+            RoleKeys.Recruiter,
+            RoleKeys.HiringManager,
+            RoleKeys.Interviewer,
+            RoleKeys.Applicant,
+            RoleKeys.LegacyHr,
+            RoleKeys.LegacyUser
+        };
         var existing = await db.Roles.ToDictionaryAsync(r => r.Name);
 
         foreach (var name in roleNames)
@@ -69,22 +78,104 @@ public static class DbSeeder
 
         var rolePermissions = new Dictionary<string, string[]>
         {
-            ["Admin"] = PermissionKeys.All,
-            ["HR"] =
+            [RoleKeys.Admin] = PermissionKeys.All,
+            [RoleKeys.Recruiter] =
             [
+                PermissionKeys.JobRead,
                 PermissionKeys.JobCreate,
+                PermissionKeys.JobUpdate,
                 PermissionKeys.JobPublish,
-                PermissionKeys.CandidateManage,
-                PermissionKeys.ApplicationStageUpdate
+                PermissionKeys.JobWeightsRead,
+                PermissionKeys.JobWeightsUpdate,
+                PermissionKeys.CandidateRead,
+                PermissionKeys.CandidateCreate,
+                PermissionKeys.CandidateUpdate,
+                PermissionKeys.CandidateCvUpload,
+                PermissionKeys.CandidateCvParse,
+                PermissionKeys.ApplicationCreate,
+                PermissionKeys.ApplicationRead,
+                PermissionKeys.ApplicationUpdateStage,
+                PermissionKeys.InterviewRead,
+                PermissionKeys.InterviewCreate,
+                PermissionKeys.InterviewMessageSend,
+                PermissionKeys.ScorecardRead,
+                PermissionKeys.ScorecardRunAuto,
+                PermissionKeys.ScorecardOverride,
+                PermissionKeys.AiEvaluationRead,
+                PermissionKeys.AiEvaluationRun,
+                PermissionKeys.AuditRead
             ],
-            ["HiringManager"] =
+            [RoleKeys.HiringManager] =
             [
-                PermissionKeys.ApplicationStageUpdate
+                PermissionKeys.JobRead,
+                PermissionKeys.CandidateRead,
+                PermissionKeys.ApplicationRead,
+                PermissionKeys.ApplicationUpdateStage,
+                PermissionKeys.InterviewRead,
+                PermissionKeys.InterviewCreate,
+                PermissionKeys.ScorecardRead,
+                PermissionKeys.ScorecardOverride,
+                PermissionKeys.AiEvaluationRead
             ],
-            ["User"] =
+            [RoleKeys.Interviewer] =
             [
-                PermissionKeys.ApplicationApply,
-                PermissionKeys.InterviewParticipate
+                PermissionKeys.InterviewRead,
+                PermissionKeys.InterviewMessageSend,
+                PermissionKeys.ScorecardRead
+            ],
+            [RoleKeys.Applicant] =
+            [
+                PermissionKeys.JobRead,
+                PermissionKeys.CandidateRead,
+                PermissionKeys.CandidateCreate,
+                PermissionKeys.CandidateUpdate,
+                PermissionKeys.CandidateCvUpload,
+                PermissionKeys.CandidateCvParse,
+                PermissionKeys.ApplicationCreate,
+                PermissionKeys.ApplicationRead,
+                PermissionKeys.InterviewRead,
+                PermissionKeys.InterviewMessageSend,
+                PermissionKeys.ScorecardRead
+            ],
+            [RoleKeys.LegacyHr] =
+            [
+                PermissionKeys.JobRead,
+                PermissionKeys.JobCreate,
+                PermissionKeys.JobUpdate,
+                PermissionKeys.JobPublish,
+                PermissionKeys.JobWeightsRead,
+                PermissionKeys.JobWeightsUpdate,
+                PermissionKeys.CandidateRead,
+                PermissionKeys.CandidateCreate,
+                PermissionKeys.CandidateUpdate,
+                PermissionKeys.CandidateCvUpload,
+                PermissionKeys.CandidateCvParse,
+                PermissionKeys.ApplicationCreate,
+                PermissionKeys.ApplicationRead,
+                PermissionKeys.ApplicationUpdateStage,
+                PermissionKeys.InterviewRead,
+                PermissionKeys.InterviewCreate,
+                PermissionKeys.InterviewMessageSend,
+                PermissionKeys.ScorecardRead,
+                PermissionKeys.ScorecardRunAuto,
+                PermissionKeys.ScorecardOverride,
+                PermissionKeys.AiEvaluationRead,
+                PermissionKeys.AiEvaluationRun,
+                PermissionKeys.AuditRead
+            ],
+            [RoleKeys.LegacyUser] =
+            [
+                PermissionKeys.JobRead,
+                PermissionKeys.CandidateRead,
+                PermissionKeys.CandidateCreate,
+                PermissionKeys.CandidateUpdate,
+                PermissionKeys.CandidateCvUpload,
+                PermissionKeys.CandidateCvParse,
+                PermissionKeys.ApplicationCreate,
+                PermissionKeys.ApplicationRead,
+                PermissionKeys.InterviewRead,
+                PermissionKeys.InterviewMessageSend,
+                PermissionKeys.ScorecardRead
             ]
         };
 
