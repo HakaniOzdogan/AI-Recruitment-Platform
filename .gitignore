@@ -17,3 +17,10 @@ deliverables/
 **/dist/
 **/bin/
 **/obj/
+
+# Uretilen teslim paketleri ve gecici dosyalar
+*.zip
+archive-deliverables/
+tmp-*
+_debug*
+!.env.example

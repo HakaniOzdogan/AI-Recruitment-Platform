@@ -9,8 +9,13 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-ik_otomasyon}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
 
   backend:
     build:
@@ -19,10 +24,18 @@ services:
     container_name: ik-backend
     restart: unless-stopped
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__Default: Host=postgres;Port=5432;Database=${POSTGRES_DB:-ik_otomasyon};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET tanimli degil - .env.example dosyasini .env olarak kopyalayin}
+      Jwt__Secret: ${JWT_SECRET}
+      CvStorage__RootPath: /app/storage
+    networks:
+      default:
+        # frontend nginx.conf istekleri http://api:8080 adresine yonlendirir
+        aliases: [api]
     ports:
       - "${BACKEND_PORT:-8080}:8080"
 
@@ -35,7 +48,7 @@ services:
     depends_on:
       - backend
     environment:
-      CHOKIDAR_USEPOLLING: "true"
+      API_BASE_URL: /api
     ports:
       - "${FRONTEND_PORT:-3000}:80"
 

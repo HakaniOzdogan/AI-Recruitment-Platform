@@ -1,3 +1,0 @@
-01-jobs.png
-02-job-detail.png
-03-interview.png

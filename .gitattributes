@@ -1,0 +1,2 @@
+# Shell betikleri Linux konteynerlerinde calistigi icin her zaman LF olmali
+*.sh text eol=lf
