@@ -104,7 +104,8 @@ public class CvParserService
         var found = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var alias in SkillAliases)
         {
-            if (Regex.IsMatch(text, $@"\b{Regex.Escape(alias.Key)}\b", RegexOptions.IgnoreCase))
+            // \b, "C#" ve ".NET" gibi harf disi karakterle baslayan/biten becerilerde eslesmez.
+            if (Regex.IsMatch(text, $@"(?<![\w#+.]){Regex.Escape(alias.Key)}(?![\w#+])", RegexOptions.IgnoreCase))
             {
                 found.Add(alias.Value);
             }
